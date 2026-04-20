@@ -2,89 +2,768 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AMBIGUITY_DETECTOR // CFG ANALYZER</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <style>
+        :root {
+            --bg: #02040a;
+            --panel: rgba(8, 12, 22, 0.97);
+            --neon: #00f2ff;
+            --text: #d8f0f8;
+            --text2: #6a8a9a;
+            --text3: #334455;
+            --border: rgba(0, 242, 255, 0.15);
+            --card: rgba(4, 8, 18, 0.9);
+            --success: #00ffaa;
+            --danger: #ff5566;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; }
+
+        .bg-grid { position: fixed; inset: 0; z-index: 0; pointer-events: none; background-image: linear-gradient(rgba(0,242,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(0,242,255,0.025) 1px, transparent 1px); background-size: 60px 60px; }
+        .page { position: fixed; inset: 0; z-index: 1; display: flex; flex-direction: column; }
+        .hidden { display: none !important; }
+
+        nav {
+            height: 60px; background: var(--panel); border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; padding: 0 24px;
+            justify-content: space-between; z-index: 10;
+        }
+        .nav-brand { font-weight: 900; letter-spacing: 3px; color: var(--neon); font-size: 0.85rem; margin: 0 20px; text-transform: uppercase; }
+
+        .btn { padding: 8px 18px; font-family: 'JetBrains Mono'; font-size: 0.65rem; cursor: pointer; border: 1px solid; transition: 0.3s; text-transform: uppercase; letter-spacing: 1px; }
+        .btn-cyan { border-color: var(--neon); color: var(--neon); background: #000; }
+        .btn-cyan:hover { background: var(--neon); color: #fff; box-shadow: 0 0 15px rgba(0,242,255,0.4); }
+        .btn-outline { border-color: var(--text3); color: var(--text2); background: transparent; }
+        .btn-outline:hover { border-color: var(--neon); color: var(--neon); }
+
+        #app-grid { display: grid; grid-template-columns: 300px 1fr 340px; height: calc(100vh - 60px); }
+        .sidebar, .right-bar { background: var(--panel); padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+        .sidebar { border-right: 1px solid var(--border); }
+        .right-bar { border-left: 1px solid var(--border); }
+
+        #matrix { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 1px; background: var(--border); overflow-y: auto; height: 100%; }
+        .pane { background: #020508; display: flex; flex-direction: column; min-height: 450px; border: 1px solid rgba(255,255,255,0.02); }
+        .pane-header { background: rgba(0,242,255,0.04); border-bottom: 1px solid var(--border); padding: 8px 15px; display: flex; align-items: center; justify-content: space-between; }
+        .pane-label-text { font-family: 'JetBrains Mono'; font-size: 0.6rem; color: var(--text3); letter-spacing: 2px; }
+        .pane-svg-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px; overflow: auto; }
+
+        .node-rect { fill: #000; stroke: var(--neon); stroke-width: 1.5; }
+        .node-text { fill: #fff; font-family: 'JetBrains Mono'; font-size: 11px; text-anchor: middle; dominant-baseline: middle; }
+        .edge { stroke: rgba(0, 242, 255, 0.2); stroke-width: 1.5; }
+
+        .section-head { font-family: 'JetBrains Mono'; font-size: 0.65rem; color: var(--neon); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+        .section-head::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+        
+        .verdict-banner { padding: 16px; border: 1px solid var(--border); background: transparent; display: flex; align-items: center; gap: 15px; margin-bottom: 10px; }
+        .verdict-icon { font-size: 1.2rem; color: var(--text3); }
+        .verdict-title { font-family: 'JetBrains Mono'; font-size: 0.7rem; font-weight: 900; letter-spacing: 2px; color: var(--text3); }
+        .verdict-body { font-size: 0.75rem; color: var(--text2); margin-top: 4px; }
+
+        .theory-block { font-family: 'JetBrains Mono'; font-size: 0.72rem; color: var(--text2); line-height: 1.6; }
+        .hl { color: var(--neon); font-weight: bold; }
+
+        #landing {
+            justify-content: center;
+            align-items: center;
+            text-align: left;
+            display: flex;
+            opacity: 1;
+            z-index: 5;
+            padding: 40px;
+            position: relative;
+        }
+        .landing-shell {
+            width: min(980px, 92vw);
+            border: 1px solid var(--border);
+            background: linear-gradient(145deg, rgba(7, 14, 30, 0.92), rgba(3, 7, 16, 0.96));
+            box-shadow: 0 22px 60px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(0, 242, 255, 0.06);
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 28px;
+            padding: 42px;
+            backdrop-filter: blur(3px);
+            position: relative;
+            overflow: hidden;
+        }
+        .landing-shell::before {
+            content: '';
+            position: absolute;
+            width: 380px;
+            height: 380px;
+            right: -120px;
+            top: -120px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(0,242,255,0.17), rgba(0,242,255,0));
+            pointer-events: none;
+        }
+        .landing-kicker {
+            font-family: 'JetBrains Mono';
+            font-size: 0.65rem;
+            letter-spacing: 3px;
+            color: var(--neon);
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+        .landing-title {
+            font-size: clamp(2.6rem, 5vw, 4.2rem);
+            line-height: 1.02;
+            font-weight: 900;
+            color: #fff;
+            letter-spacing: 1.5px;
+            margin-bottom: 14px;
+        }
+        .landing-title span { color: transparent; -webkit-text-stroke: 1px var(--neon); }
+        .landing-sub {
+            font-size: 0.95rem;
+            color: var(--text2);
+            max-width: 560px;
+            line-height: 1.7;
+            margin-bottom: 26px;
+        }
+        .landing-actions { display: flex; align-items: center; gap: 14px; }
+        .landing-primary {
+            padding: 12px 28px;
+            letter-spacing: 1.4px;
+            border-color: var(--neon);
+            color: var(--neon);
+            background: rgba(0,0,0,0.6);
+        }
+        .landing-primary:hover {
+            background: var(--neon);
+            color: #002228;
+            box-shadow: 0 0 26px rgba(0,242,255,0.35);
+        }
+        .landing-note {
+            font-family: 'JetBrains Mono';
+            font-size: 0.62rem;
+            letter-spacing: 1.5px;
+            color: var(--text3);
+            text-transform: uppercase;
+        }
+        .landing-panel {
+            border: 1px solid var(--border);
+            background: rgba(0,0,0,0.28);
+            padding: 16px 18px;
+            align-self: stretch;
+        }
+        .landing-panel-title {
+            font-family: 'JetBrains Mono';
+            font-size: 0.62rem;
+            letter-spacing: 2px;
+            color: var(--success);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+        .landing-list {
+            list-style: none;
+            display: grid;
+            gap: 10px;
+            font-family: 'JetBrains Mono';
+            font-size: 0.69rem;
+            color: var(--text2);
+        }
+        .landing-list li::before {
+            content: '▸ ';
+            color: var(--neon);
+        }
+
+        #info-modal { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .modal-box { background: #050a15; border: 1px solid var(--neon); padding: 40px; width: 650px; position: relative; }
+        .modal-close { position: absolute; top: 15px; right: 20px; cursor: pointer; color: var(--neon); font-family: 'JetBrains Mono'; }
+
+        @keyframes slideIn { from { opacity: 0; transform: translateY(20px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+        .page-enter { animation: slideIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        .page-exit { animation: fadeOut 0.3s ease forwards; }
+
+        .code-block { background: rgba(0, 0, 0, 0.3); border-left: 2px solid var(--neon); padding: 20px; font-family: 'JetBrains Mono'; font-size: 0.75rem; line-height: 1.8; color: var(--text2); }
+        .code-block p { margin-bottom: 12px; }
+        .theory-scroll-area::-webkit-scrollbar { width: 4px; }
+        .theory-scroll-area::-webkit-scrollbar-thumb { background: var(--border); }
+
+        .error-msg { font-family: 'JetBrains Mono'; font-size: 0.65rem; color: var(--danger); margin-top: 6px; line-height: 1.5; }
+    </style>
 </head>
 <body>
-    <div class="bg-grid"></div>
+<div class="bg-grid"></div>
 
-    <div id="info-modal">
-        <div class="modal-box">
-            <div class="modal-close" onclick="closeModal()">[ CLOSE ]</div>
-            <h3 style="color:var(--neon); margin-bottom:20px; letter-spacing:2px;">THEORY_DOCUMENTATION_V1.2</h3>
-            <div class="theory-scroll-area" style="max-height: 450px; overflow-y: auto; padding-right: 10px;">
-                <div class="code-block">
-                    <span class="hl">// 01_WHAT_IS_AMBIGUITY?</span>
-                    <p>In Theory of Computation, a Context-Free Grammar (CFG) is ambiguous if there exists at least one string that can be generated by two or more distinct Parse Trees.</p>
-                    <span class="hl">// 02_THE_ROOT_CAUSE</span>
-                    <p>Ambiguity arises when rules lack precedence or associativity.</p>
-                </div>
+<div id="info-modal">
+    <div class="modal-box">
+        <div class="modal-close" onclick="closeModal()">[ CLOSE ]</div>
+        <h3 style="color:var(--neon); margin-bottom:20px; letter-spacing:2px;">THEORY_DOCUMENTATION_V1.2</h3>
+        <div class="theory-scroll-area" style="max-height: 450px; overflow-y: auto; padding-right: 10px;">
+            <div class="code-block">
+                <span class="hl">// 01_WHAT_IS_AMBIGUITY?</span>
+                <p>In Theory of Computation, a Context-Free Grammar (CFG) is ambiguous if there exists at least one string in its language that can be generated by two or more distinct <b>Parse Trees</b> (or equivalently, two or more unique leftmost derivations). This indicates structural overlap in the production rules.</p>
+                
+                <span class="hl">// 02_THE_ROOT_CAUSE</span>
+                <p>Ambiguity typically arises when a grammar fails to define <b>Precedence</b> (which operators bind tighter) and <b>Associativity</b> (whether identical operators group left-to-right or right-to-left). Without these constraints, a parser cannot deterministically resolve how to build the syntax tree.</p>
+
+                <span class="hl">// 03_RESOLUTION_STRATEGY</span>
+                <p>We solve this by refactoring into an Unambiguous Grammar using <b>Stratification</b>. By introducing hierarchical <b>Non-Terminals</b> (e.g., splitting a generic Expr rule into Expr, Term, and Factor), we force higher-precedence operations to be evaluated deeper in the parse tree.</p>
+
+                <span class="hl">// 04_SUPPORTED_SYNTAX</span>
+                <p>Non-terminals: any word in ALL_CAPS or single uppercase letter (e.g., S, Expr, Stmt). Terminals: lowercase words or symbols (e.g., a, +, id, while). Epsilon: use <b>eps</b> or <b>epsilon</b> for empty productions. Multi-char terminals must be space-separated in target string.</p>
             </div>
         </div>
     </div>
+</div>
 
-    <div id="landing" class="page">
-        <div class="landing-shell">
-            <div>
-                <div class="landing-kicker">Computational Grammar Lab</div>
-                <h1 class="landing-title">AMBIGUITY <span>DETECTOR</span></h1>
-                <p class="landing-sub">Analyze context-free grammars and visualize parse-tree variants.</p>
-                <div class="landing-actions">
-                    <button class="btn landing-primary" onclick="launch()">Launch Analyzer</button>
-                </div>
-            </div>
-            <div class="landing-panel">
-                <div class="landing-panel-title">Capabilities</div>
-                <ul class="landing-list">
-                    <li>Detect valid/ambiguous derivations</li>
-                    <li>Render visual parse trees</li>
-                    <li>Auto-resolve structural patterns</li>
-                </ul>
+<div id="landing" class="page">
+    <div class="landing-shell">
+        <div>
+            <div class="landing-kicker">Computational Grammar Lab</div>
+            <h1 class="landing-title">AMBIGUITY <span>DETECTOR</span></h1>
+            <p class="landing-sub">
+                Analyze context-free grammars, visualize parse-tree variants, and resolve practical ambiguity patterns.
+            </p>
+            <div class="landing-actions">
+                <button class="btn landing-primary" onclick="launch()">Launch Analyzer</button>
+                <div class="landing-note">Interactive parser matrix • Earley-based scan</div>
             </div>
         </div>
-    </div>
-
-    <div id="main-ui" class="page hidden">
-        <nav>
-            <div style="display:flex; align-items:center;">
-                <button class="btn btn-outline" onclick="exit()">« EXIT</button>
-                <div class="nav-brand">AMBIGUITY-DETECTOR // CFG_ANALYZER</div>
-            </div>
-            <div style="display:flex; align-items:center; gap:12px;">
-                <button class="btn btn-outline" style="border-color: var(--success); color: var(--success);" onclick="autoResolve()">⚡ AUTO-RESOLVE</button>
-                <button class="btn btn-cyan" onclick="run()">▶ GENERATE MATRIX</button>
-                <button class="btn btn-outline" onclick="openModal()">? THEORY</button>
-            </div>
-        </nav>
-
-        <div id="app-grid">
-            <div class="sidebar">
-                <div class="section-head">Grammar Rules</div>
-                <textarea id="rules" rows="10">S -> S + S | S * S | a</textarea>
-                <div id="grammar-error" class="error-msg" style="display:none;"></div>
-                <div class="section-head">Target String</div>
-                <input type="text" id="target" value="a + a * a">
-                <div id="target-error" class="error-msg" style="display:none;"></div>
-                <div id="log-line" style="font-family:'JetBrains Mono'; font-size:0.6rem; color:#fff; margin-top:auto;">&gt; SYSTEM_READY</div>
-            </div>
-            <div id="matrix"><div class="pane"><div class="pane-svg-wrap">AWAITING SCAN...</div></div></div>
-            <div class="right-bar">
-                <div class="section-head">Verdict</div>
-                <div class="verdict-banner" id="verdict-box">
-                    <div class="verdict-icon">◇</div>
-                    <div>
-                        <div class="verdict-title" id="verdict-title">PENDING</div>
-                        <div class="verdict-body" id="verdict-body">Run scan to detect ambiguity.</div>
-                    </div>
-                </div>
-                <div class="section-head">Theory</div>
-                <div id="why-text" class="theory-block">Awaiting scan...</div>
-            </div>
+        <div class="landing-panel">
+            <div class="landing-panel-title">Capabilities</div>
+            <ul class="landing-list">
+                <li>Detect valid, invalid, and ambiguous derivations</li>
+                <li>Render parse trees in a visual matrix workspace</li>
+                <li>Auto-resolve common structural ambiguity patterns</li>
+                <li>Supports epsilon productions and tokenized inputs</li>
+            </ul>
         </div>
     </div>
+</div>
 
-    <script src="script.js"></script>
+<div id="main-ui" class="page hidden">
+    <nav>
+        <div style="display:flex; align-items:center;">
+            <button class="btn btn-outline" onclick="exit()">« EXIT</button>
+            <div class="nav-brand">AMBIGUITY-DETECTOR // CFG_ANALYZER</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <button class="btn btn-outline" style="border-color: var(--success); color: var(--success);" onclick="autoResolve()">⚡ AUTO-RESOLVE</button>
+            <button class="btn btn-cyan" onclick="run()">▶ GENERATE MATRIX</button>
+            <button class="btn btn-outline" onclick="openModal()">? THEORY REFERENCE</button>
+        </div>
+    </nav>
+
+    <div id="app-grid">
+        <div class="sidebar">
+            <div class="section-head">Grammar Rules</div>
+            <textarea id="rules" rows="10" style="background:transparent; border:1px solid var(--border); color:#fff; padding:10px; font-family:'JetBrains Mono'; outline:none; resize:none; font-size:0.75rem;">S -> S + S | S * S | a</textarea>
+            <div id="grammar-error" class="error-msg" style="display:none;"></div>
+            <div class="section-head">Target String</div>
+            <input type="text" id="target" value="a + a * a" style="background:transparent; border:1px solid var(--border); color:#fff; padding:10px; font-family:'JetBrains Mono'; outline:none; font-size:0.75rem;">
+            <div id="target-error" class="error-msg" style="display:none;"></div>
+            
+            <div style="font-family:'JetBrains Mono'; font-size:0.6rem; color:#fff; line-height:1.6; margin-top:8px;">
+                TIPS:<br>
+                · Non-terminals: S, Expr, Stmt<br>
+                · Terminals: a, +, id, while<br>
+                · Epsilon: use "eps" or "epsilon"<br>
+                · Separate tokens with spaces
+            </div>
+            
+            <div id="log-line" style="font-family:'JetBrains Mono'; font-size:0.6rem; color:#fff; margin-top:auto;">&gt; SYSTEM_READY</div>
+        </div>
+        <div id="matrix"><div class="pane"><div class="pane-svg-wrap" style="color:var(--text3); font-family:'JetBrains Mono';">AWAITING SCAN...</div></div></div>
+        <div class="right-bar">
+            <div class="section-head">Verdict</div>
+            <div class="verdict-banner" id="verdict-box">
+                <div class="verdict-icon">◇</div>
+                <div>
+                    <div class="verdict-title" id="verdict-title">PENDING</div>
+                    <div class="verdict-body" id="verdict-body">Run a scan to detect ambiguity.</div>
+                </div>
+            </div>
+            <div class="section-head">Theory</div>
+            <div id="why-text" class="theory-block">Awaiting scan...</div>
+            <br>
+            <div class="section-head">Resolution</div>
+            <div id="how-text" class="theory-block">Awaiting scan...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ─── UTILITIES ────────────────────────────────────────────────────────────────
+function isNonTerminal(sym, grammar) {
+    return sym in grammar;
+}
+
+const EPSILON = '__eps__';
+function normaliseEpsilon(tok) {
+    return (tok === 'eps' || tok === 'epsilon') ? EPSILON : tok;
+}
+
+// ─── GRAMMAR VALIDATION ───────────────────────────────────────────────────────
+function validateGrammar(text) {
+    const errors = [];
+    if (!text.trim()) { errors.push('Grammar is empty.'); return errors; }
+    const lines = text.split('\n').filter(l => l.trim());
+    lines.forEach((line, i) => {
+        const hasSep = line.includes('->') || line.includes('→');
+        if (!hasSep) { errors.push(`Line ${i+1}: missing "->" separator → "${line.trim()}"`); return; }
+        const sep = line.includes('->') ? '->' : '→';
+        const parts = line.split(sep);
+        if (parts.length < 2 || !parts[0].trim()) {
+            errors.push(`Line ${i+1}: missing left-hand side.`);
+        }
+        if (parts.length > 2) {
+            errors.push(`Line ${i+1}: multiple "->" found. Did you mean "|"?`);
+        }
+    });
+    return errors;
+}
+
+// ─── GRAMMAR PARSER ───────────────────────────────────────────────────────────
+function parseGrammar(text) {
+    const g = {};
+    text.split('\n').forEach(line => {
+        const sep = line.includes('->') ? '->' : (line.includes('→') ? '→' : null);
+        if (!sep) return;
+        const idx = line.indexOf(sep);
+        const key = line.slice(0, idx).trim();
+        const rhs = line.slice(idx + sep.length);
+        if (!key) return;
+        if (!g[key]) g[key] = [];
+        rhs.split('|').forEach(p => {
+            const tokens = p.trim().split(/\s+/).filter(Boolean).map(normaliseEpsilon);
+            if (tokens.length === 1 && tokens[0] === EPSILON) {
+                g[key].push([]);
+            } else {
+                g[key].push(tokens.filter(t => t !== EPSILON));
+            }
+        });
+    });
+    return g;
+}
+
+// ─── EARLEY PARSER ────────────────────────────────────────────────────────────
+function getStartSymbol(text) {
+    const lines = text.split('\n').filter(l => l.trim());
+    for (const line of lines) {
+        const sep = line.includes('->') ? '->' : (line.includes('→') ? '→' : null);
+        if (sep) return line.slice(0, line.indexOf(sep)).trim();
+    }
+    return null;
+}
+
+function earley(g, tokens, start) {
+    if (!start || !g[start]) return [];
+    const chart = Array.from({length: tokens.length + 1}, () => []);
+    const seen  = Array.from({length: tokens.length + 1}, () => new Set());
+
+    function stateKey(s) { return `${s.lhs}::${s.rhs.join(' ')}@${s.dot}@${s.origin}`; }
+    function add(col, state) {
+        const k = stateKey(state);
+        if (!seen[col].has(k)) { seen[col].add(k); chart[col].push(state); return true; }
+        return false;
+    }
+
+    (g[start] || []).forEach(p => add(0, {lhs: start, rhs: p, dot: 0, origin: 0, children: []}));
+
+    for (let i = 0; i <= tokens.length; i++) {
+        let j = 0;
+        while (j < chart[i].length) {
+            const s = chart[i][j++];
+            const next = s.rhs[s.dot];
+
+            if (s.dot < s.rhs.length) {
+                if (isNonTerminal(next, g)) {
+                    (g[next] || []).forEach(p => add(i, {lhs: next, rhs: p, dot: 0, origin: i, children: []}));
+                } else if (i < tokens.length && next === tokens[i]) {
+                    add(i + 1, {...s, dot: s.dot + 1, children: [...s.children, {lhs: next, terminal: true}]});
+                }
+            } else {
+                chart[s.origin].forEach(p => {
+                    if (p.rhs[p.dot] === s.lhs) {
+                        add(i, {...p, dot: p.dot + 1, children: [...p.children, s]});
+                    }
+                });
+            }
+        }
+    }
+    return chart[tokens.length].filter(s => s.lhs === start && s.dot === s.rhs.length && s.origin === 0);
+}
+
+// ─── TREE UTILITIES ───────────────────────────────────────────────────────────
+function buildNodeTree(item) {
+    return item.terminal
+        ? {sym: item.lhs, terminal: true}
+        : {sym: item.lhs, children: item.children.map(buildNodeTree)};
+}
+function treeStr(n) {
+    return n.terminal ? n.sym : n.sym + '(' + (n.children||[]).map(treeStr).join(',') + ')';
+}
+function countLeaves(node) {
+    if (!node.children || node.children.length === 0) return 1;
+    return node.children.reduce((a, c) => a + countLeaves(c), 0);
+}
+
+// ─── SVG TREE RENDER ─────────────────────────────────────────────────────────
+function renderTree(id, node) {
+    const wrap = document.getElementById(id);
+    const pos = []; let counter = 0;
+    const hSp = 70, vSp = 80;
+    function layout(n, offsetX, y) {
+        const cid = counter++;
+        const x = offsetX + (countLeaves(n) * hSp) / 2;
+        const entry = {id: cid, x, y, sym: n.sym, kids: []};
+        pos.push(entry);
+        if (n.children && n.children.length > 0) {
+            let cx = offsetX;
+            n.children.forEach(c => {
+                const childId = layout(c, cx, y + vSp);
+                entry.kids.push(childId);
+                cx += countLeaves(c) * hSp;
+            });
+        }
+        return cid;
+    }
+    layout(node, 0, 40);
+    const maxX = Math.max(...pos.map(p => p.x)) + 60;
+    const maxY = Math.max(...pos.map(p => p.y)) + 50;
+    let svg = `<svg width="${maxX}" height="${maxY}" viewBox="0 0 ${maxX} ${maxY}">`;
+    pos.forEach(p => {
+        p.kids.forEach(k => {
+            const c = pos.find(o => o.id === k);
+            svg += `<line x1="${p.x}" y1="${p.y}" x2="${c.x}" y2="${c.y}" class="edge"/>`;
+        });
+    });
+    pos.forEach(p => {
+        const boxW = Math.max(44, p.sym.length * 9 + 16);
+        svg += `<rect x="${p.x - boxW/2}" y="${p.y-13}" width="${boxW}" height="26" rx="4" class="node-rect"/>`;
+        svg += `<text x="${p.x}" y="${p.y+5}" class="node-text">${p.sym}</text>`;
+    });
+    wrap.innerHTML = svg + `</svg>`;
+}
+
+// ─── MAIN RUN ─────────────────────────────────────────────────────────────────
+function run() {
+    const rulesText = document.getElementById('rules').value;
+    const targetRaw = document.getElementById('target').value.trim();
+    const gErrEl = document.getElementById('grammar-error');
+    const tErrEl = document.getElementById('target-error');
+    gErrEl.style.display = 'none';
+    tErrEl.style.display = 'none';
+
+    const gErrors = validateGrammar(rulesText);
+    if (gErrors.length) {
+        gErrEl.innerHTML = gErrors.join('<br>');
+        gErrEl.style.display = 'block';
+        document.getElementById('log-line').innerText = '> GRAMMAR_ERROR: CHECK RULES';
+        return;
+    }
+
+    const g = parseGrammar(rulesText);
+    const start = getStartSymbol(rulesText);
+    const tokens = targetRaw ? targetRaw.split(/\s+/).filter(Boolean) : [];
+
+    const allTerminals = new Set();
+    Object.values(g).flat().flat().forEach(t => { if (!isNonTerminal(t, g) && t !== EPSILON) allTerminals.add(t); });
+    const unknownTokens = tokens.filter(t => !allTerminals.has(t) && !isNonTerminal(t, g));
+    if (unknownTokens.length > 0) {
+        tErrEl.innerHTML = `Unknown token(s): ${unknownTokens.map(t=>`"${t}"`).join(', ')} — not defined in any production.`;
+        tErrEl.style.display = 'block';
+    }
+
+    const items = earley(g, tokens, start);
+    const unique = [];
+    items.forEach(it => {
+        const t = buildNodeTree(it);
+        if (!unique.some(u => treeStr(u) === treeStr(t))) unique.push(t);
+    });
+
+    const matrix = document.getElementById('matrix');
+    matrix.innerHTML = '';
+
+    const vTitle = document.getElementById('verdict-title');
+    const vBody  = document.getElementById('verdict-body');
+    const why    = document.getElementById('why-text');
+    const how    = document.getElementById('how-text');
+
+    if (unique.length === 0) {
+        vTitle.innerText = "INVALID STRING"; vTitle.style.color = "var(--danger)";
+        vBody.innerText = "No valid derivation found.";
+        matrix.innerHTML = `<div class="pane"><div class="pane-svg-wrap" style="color:var(--danger); font-family:'JetBrains Mono';">✕ NO VALID DERIVATION</div></div>`;
+        why.innerHTML = `This string is not part of the language generated by the CFG. No sequence of <span class="hl">production rules</span> can derive this exact sequence of terminals.`;
+        how.innerHTML = `Verify that all tokens in the target string appear as terminals in the grammar. Check for missing operators or mismatched symbols.`;
+        document.getElementById('log-line').innerText = '> SCAN_COMPLETE: NO DERIVATION FOUND';
+        return;
+    }
+
+    unique.forEach((tree, i) => {
+        const pane = document.createElement('div');
+        pane.className = 'pane';
+        pane.innerHTML = `<div class="pane-header"><span class="pane-label-text">TREE_BUFFER_${String(i+1).padStart(2,'0')}</span></div><div class="pane-svg-wrap" id="t${i}"></div>`;
+        matrix.appendChild(pane);
+        renderTree(`t${i}`, tree);
+    });
+
+    if (unique.length > 1) {
+        vTitle.innerText = "AMBIGUOUS"; vTitle.style.color = "var(--danger)";
+        vBody.innerText = `${unique.length} distinct parse trees found.`;
+        why.innerHTML = `A CFG is <span class="hl">ambiguous</span> if a string yields two or more distinct <b>parse trees</b>. The production rules lack defined <b>precedence</b> or <b>associativity</b>, allowing multiple valid syntactic structures.`;
+        how.innerHTML = `Rewrite using <span class="hl">Stratification</span> — introduce new non-terminals (e.g., Expr, Term, Factor) to enforce a strict structural hierarchy. Use <b>⚡ AUTO-RESOLVE</b> to attempt automatic stratification.`;
+    } else {
+        vTitle.innerText = "UNAMBIGUOUS"; vTitle.style.color = "var(--success)";
+        vBody.innerText = "Unique parse tree detected.";
+        why.innerHTML = `This CFG is <span class="hl">unambiguous</span> for the given string — exactly one parse tree exists. The structural hierarchy is fully deterministic.`;
+        how.innerHTML = `No modifications required. The grammar reliably defines the syntax without logical overlaps.`;
+    }
+    document.getElementById('log-line').innerText = `> SCAN_COMPLETE: ${unique.length} TREE(S) FOUND`;
+}
+
+// ─── AUTO-RESOLVE ─────────────────────────────────────────────────────────────
+function autoResolve() {
+    const input = document.getElementById('rules').value;
+    const gErrors = validateGrammar(input);
+    if (gErrors.length) {
+        document.getElementById('grammar-error').innerHTML = gErrors.join('<br>');
+        document.getElementById('grammar-error').style.display = 'block';
+        return;
+    }
+
+    const g = parseGrammar(input);
+    const ntNames = Object.keys(g);
+    const start = getStartSymbol(input);
+    const targetRaw = document.getElementById('target').value.trim();
+    const tokens = targetRaw ? targetRaw.split(/\s+/).filter(Boolean) : [];
+    const existingItems = earley(g, tokens, start);
+    const existingUnique = [];
+    existingItems.forEach(it => {
+        const t = buildNodeTree(it);
+        if (!existingUnique.some(u => treeStr(u) === treeStr(t))) existingUnique.push(t);
+    });
+
+    if (existingUnique.length <= 1) {
+        document.getElementById('log-line').innerText = '> AUTO-RESOLVE SKIPPED: GRAMMAR ALREADY UNAMBIGUOUS FOR TARGET';
+        run();
+        return;
+    }
+
+    function freshName(base) {
+        let candidate = base + '_1';
+        let n = 1;
+        while (ntNames.includes(candidate)) { n++; candidate = base + '_' + n; }
+        ntNames.push(candidate);
+        return candidate;
+    }
+
+    function altToText(tokens) {
+        return tokens.length === 0 ? 'eps' : tokens.join(' ');
+    }
+
+    function replaceSelfRef(tokens, lhs, replacement) {
+        return tokens.map(t => t === lhs ? replacement : t);
+    }
+
+    function dedupeAlts(alts) {
+        const seen = new Set();
+        return alts.filter(a => {
+            const k = JSON.stringify(a);
+            if (seen.has(k)) return false;
+            seen.add(k);
+            return true;
+        });
+    }
+
+    function buildTreeSpecificGrammar(rootTree, startSymbol) {
+        const createdRules = [];
+        const counts = {};
+
+        function nextName(base) {
+            counts[base] = (counts[base] || 0) + 1;
+            return `${base}_R${counts[base]}`;
+        }
+
+        function walk(node) {
+            if (node.terminal) return {name: node.sym, terminal: true};
+
+            const thisName = nextName(node.sym);
+            const rhs = [];
+            (node.children || []).forEach(ch => {
+                const child = walk(ch);
+                rhs.push(child.name);
+            });
+            createdRules.push(`${thisName} -> ${rhs.length ? rhs.join(' ') : 'eps'}`);
+            return {name: thisName, terminal: false};
+        }
+
+        const root = walk(rootTree);
+        const lines = [];
+        lines.push(`${startSymbol} -> ${root.name}`);
+        createdRules.forEach(r => lines.push(r));
+        return lines;
+    }
+
+    function tryExpressionStratification(lhs, alts) {
+        const binary = [];
+        const remaining = [];
+
+        alts.forEach(a => {
+            if (a.length === 3 && a[0] === lhs && a[2] === lhs && !isNonTerminal(a[1], g)) {
+                binary.push({op: a[1]});
+            } else {
+                remaining.push(a);
+            }
+        });
+
+        if (binary.length === 0 || remaining.length === 0) return null;
+
+        const precedence = {
+            '||': 1, '&&': 2,
+            '==': 3, '!=': 3,
+            '<': 4, '<=': 4, '>': 4, '>=': 4,
+            '+': 5, '-': 5,
+            '*': 6, '/': 6, '%': 6,
+            '^': 7
+        };
+
+        const ops = [...new Set(binary.map(b => b.op))];
+        ops.sort((a, b) => {
+            const pa = (a in precedence) ? precedence[a] : 5;
+            const pb = (b in precedence) ? precedence[b] : 5;
+            return pa - pb || a.localeCompare(b);
+        });
+
+        const grouped = [];
+        ops.forEach(op => {
+            const p = (op in precedence) ? precedence[op] : 5;
+            const last = grouped[grouped.length - 1];
+            if (!last || last.prec !== p) grouped.push({prec: p, ops: [op]});
+            else last.ops.push(op);
+        });
+
+        const top = freshName(lhs);
+        const levels = grouped.map(() => freshName(lhs));
+        const atom = freshName(lhs);
+        const out = [];
+
+        out.push(`${lhs} -> ${top}`);
+        levels.forEach((lvl, idx) => {
+            const next = idx === levels.length - 1 ? atom : levels[idx + 1];
+            const opsHere = grouped[idx].ops;
+            const rightAssoc = opsHere.length === 1 && opsHere[0] === '^';
+            const tails = opsHere.map(op =>
+                rightAssoc ? `${next} ${op} ${lvl}` : `${lvl} ${op} ${next}`
+            );
+            out.push(`${lvl} -> ${tails.join(' | ')} | ${next}`);
+        });
+
+        const atomAlts = dedupeAlts(remaining.map(a => replaceSelfRef(a, lhs, top)));
+        out.push(`${atom} -> ${atomAlts.map(altToText).join(' | ')}`);
+        out[0] = `${lhs} -> ${levels[0]}`;
+        return out;
+    }
+
+    function eliminateImmediateLeftRecursion(lhs, alts) {
+        const leftRec = [];
+        const base = [];
+
+        alts.forEach(a => {
+            if (a[0] === lhs) leftRec.push(a.slice(1));
+            else base.push(a);
+        });
+
+        if (leftRec.length === 0 || base.length === 0) return null;
+
+        const next = freshName(lhs);
+        const out = [];
+        const lhsAlts = base.map(b => [...b, next]);
+        const nextAlts = leftRec.map(r => [...r, next]);
+        nextAlts.push([]);
+
+        out.push(`${lhs} -> ${dedupeAlts(lhsAlts).map(altToText).join(' | ')}`);
+        out.push(`${next} -> ${dedupeAlts(nextAlts).map(altToText).join(' | ')}`);
+        return out;
+    }
+
+    const newLines = [];
+    let changed = false;
+
+    Object.keys(g).forEach(lhs => {
+        const alts = g[lhs].map(a => [...a]);
+        const expressionRewrite = tryExpressionStratification(lhs, alts);
+        if (expressionRewrite) {
+            changed = true;
+            expressionRewrite.forEach(line => newLines.push(line));
+            return;
+        }
+
+        const leftRecRewrite = eliminateImmediateLeftRecursion(lhs, alts);
+        if (leftRecRewrite) {
+            changed = true;
+            leftRecRewrite.forEach(line => newLines.push(line));
+            return;
+        }
+
+        newLines.push(`${lhs} -> ${alts.map(altToText).join(' | ')}`);
+    });
+
+    if (!changed) {
+        const items = earley(g, tokens, start);
+        const unique = [];
+        items.forEach(it => {
+            const t = buildNodeTree(it);
+            if (!unique.some(u => treeStr(u) === treeStr(t))) unique.push(t);
+        });
+
+        if (unique.length > 1 && start) {
+            const deterministicLines = buildTreeSpecificGrammar(unique[0], start);
+            document.getElementById('rules').value = deterministicLines.join('\n');
+            document.getElementById('log-line').innerText = '> AUTO-RESOLVE: DERIVATION-SPECIFIC GRAMMAR GENERATED';
+            run();
+            return;
+        }
+
+        document.getElementById('log-line').innerText = '> AUTO-RESOLVE: NO REWRITABLE PATTERN DETECTED';
+        run();
+        return;
+    }
+
+    document.getElementById('rules').value = newLines.join('\n');
+    document.getElementById('log-line').innerText = '> STRATIFICATION_COMPLETE: AUTO-RESOLVE APPLIED';
+    run();
+}
+
+// ─── NAV ──────────────────────────────────────────────────────────────────────
+function launch() {
+    const landing = document.getElementById('landing');
+    const main = document.getElementById('main-ui');
+    landing.classList.add('page-exit');
+    setTimeout(() => {
+        landing.classList.add('hidden'); landing.classList.remove('page-exit');
+        main.classList.remove('hidden'); main.classList.add('page-enter');
+    }, 300);
+}
+
+function exit() {
+    const main = document.getElementById('main-ui');
+    const landing = document.getElementById('landing');
+    main.classList.add('page-exit');
+    setTimeout(() => {
+        main.classList.add('hidden'); main.classList.remove('page-exit','page-enter');
+        landing.classList.remove('hidden','page-exit'); landing.classList.add('page-enter');
+        document.getElementById('rules').value = 'S -> S + S | S * S | a';
+        document.getElementById('target').value = 'a + a * a';
+        document.getElementById('matrix').innerHTML = '<div class="pane"><div class="pane-svg-wrap" style="color:var(--text3); font-family:\'JetBrains Mono\';">AWAITING SCAN...</div></div>';
+        document.getElementById('verdict-title').innerText = "PENDING";
+        document.getElementById('verdict-title').style.color = "var(--text3)";
+        document.getElementById('verdict-body').innerText = "Run a scan to detect ambiguity.";
+        document.getElementById('why-text').innerText = "Awaiting scan...";
+        document.getElementById('how-text').innerText = "Awaiting scan...";
+        document.getElementById('log-line').innerText = "> SYSTEM_READY";
+        document.getElementById('grammar-error').style.display = 'none';
+        document.getElementById('target-error').style.display = 'none';
+    }, 300);
+}
+
+function openModal()  { document.getElementById('info-modal').style.display = 'flex'; }
+function closeModal() { document.getElementById('info-modal').style.display = 'none'; }
+</script>
 </body>
 </html>
