@@ -1,13 +1,34 @@
-# CFG Ambiguity Detector & Resolver
-A web-based tool to analyze Context-Free Grammars for ambiguity and automatically resolve hierarchy issues.
+# TOC Ambiguity Detector
 
-## Features
-* **Ambiguity Detection:** Identifies if a string has multiple parse trees.
-* **Auto-Resolve:** Automatically stratifies recursive grammars to fix ambiguity.
-* **Visualization:** Generates a matrix and visual tree structure for student learning.
+A computational tool designed to detect and visualize ambiguity in Context-Free Grammars (CFG). Built with the **Earley Parsing Algorithm**, this lab environment provides real-time parse tree generation and automatic grammar stratification.
 
-## How to Use
-1. Enter your Context-Free Grammar (e.g., `S -> SS | a`).
-2. Type a target string.
-3. Click **Generate Matrix** to see the results.
-4. Use **Auto-Resolve** if the grammar is reported as ambiguous.
+
+---
+
+## Tech Stack
+
+| Layer | Technologies |
+| :--- | :--- |
+| **Frontend** | **HTML5** (Semantic structure) & **CSS3** (Modern Flex/Grid) |
+| **Logic Engine** | **JavaScript (ES6+)** |
+| **Algorithm** | **Earley Parser** |
+| **Visuals** | **SVG** (Scalable Vector Graphics) for dynamic tree rendering |
+| **Typography** | **Google Fonts** (Outfit & JetBrains Mono for a terminal aesthetic) |
+| **Deployment** | **Vercel** |
+
+---
+
+## Key Features
+
+- **Ambiguity Detection**: Identifies if a string has multiple valid leftmost derivations.
+- **Dynamic Parse Tree Matrix**: Renders distinct SVG parse trees side-by-side for visual comparison.
+- **Auto-Resolve (Stratification)**: Automatically refactors ambiguous grammars into hierarchical structures by applying precedence and associativity logic.
+- **Earley-Based Scanning**: Handles CFGs, including epsilon productions (`eps`) and recursive rules.
+
+
+## Project Structure
+
+- `index.html`: The core application shell and UI.
+- `style.css`: Custom theme, grid layouts, and SVG styling.
+- `script.js`: The engine featuring the Earley Parser, validation logic, and tree layout algorithms.
+
